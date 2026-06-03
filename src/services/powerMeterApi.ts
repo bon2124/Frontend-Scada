@@ -1,11 +1,23 @@
 import api from './config'
 import type { PowerMeterData, HistoryParams } from './types'
+import { USE_MOCK, mockPowerMeterData, mockPowerMeterHistory } from './mockData'
 
-// Power Meter APIs
+const delay = (ms = 300) => new Promise(res => setTimeout(res, ms))
+
 export const powerMeterApi = {
-  // Get latest power meter data
-  get: () => api.get<PowerMeterData>('/power-meter'),
-  
-  // Get power meter history
-  getHistory: (params?: HistoryParams) => api.get<PowerMeterData[]>('/power-meter/history', { params }),
+  get: async () => {
+    if (USE_MOCK) {
+      await delay()
+      return { data: { ...mockPowerMeterData, time: new Date().toISOString() } }
+    }
+    return api.get<PowerMeterData>('/power-meter')
+  },
+
+  getHistory: async (params?: HistoryParams) => {
+    if (USE_MOCK) {
+      await delay()
+      return { data: mockPowerMeterHistory }
+    }
+    return api.get<PowerMeterData[]>('/power-meter/history', { params })
+  },
 }
