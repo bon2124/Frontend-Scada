@@ -5,10 +5,10 @@ import type { WeatherData, InverterData, PowerMeterData, TimeSeriesResponse } fr
 // ============================================================
 export const USE_MOCK = true
 
-// ---- Helper ----
-const rand = (min: number, max: number) => parseFloat((Math.random() * (max - min) + min).toFixed(2))
+const rand = (min: number, max: number) =>
+  parseFloat((Math.random() * (max - min) + min).toFixed(2))
 
-// ---- Weather / Environmental ----
+// ─── Weather ────────────────────────────────────────────────
 export const mockWeatherData: WeatherData = {
   Irradiance: 754.3,
   Ambient_Temp: 32.5,
@@ -29,7 +29,7 @@ export const mockWeatherHistory: WeatherData[] = Array.from({ length: 24 }, (_, 
   }
 })
 
-// ---- Inverters ----
+// ─── Inverters ──────────────────────────────────────────────
 const makeInverter = (id: string, acPowerKw: number): InverterData => ({
   inverter_id: id,
   DC_Voltage_MPPT1: rand(370, 400),
@@ -70,7 +70,7 @@ export const mockInverterHistory = (inverterId: string): InverterData[] =>
     }
   })
 
-// ---- Power Meter ----
+// ─── Power Meter ────────────────────────────────────────────
 export const mockPowerMeterData: PowerMeterData = {
   Voltage_U1: 229.4,
   Voltage_U2: 230.1,
@@ -108,7 +108,7 @@ export const mockPowerMeterHistory: PowerMeterData[] = Array.from({ length: 24 }
   }
 })
 
-// ---- Time Series (dùng cho chart history) ----
+// ─── Time Series (dùng chung cho mọi deviceId) ──────────────
 export const mockTimeSeriesResponse = (deviceId: string): { data: TimeSeriesResponse } => {
   const data = Array.from({ length: 24 }, (_, hour) => {
     const isDay = hour >= 6 && hour <= 18
@@ -128,8 +128,11 @@ export const mockTimeSeriesResponse = (deviceId: string): { data: TimeSeriesResp
   return {
     data: {
       deviceId,
-      metricsRequested: ['Irradiance', 'Ambient_Temp', 'Module_Temp', 'AC_Power', 'AC_Voltage', 'AC_Frequency', 'Total_Power_P'],
+      metricsRequested: [
+        'Irradiance', 'Ambient_Temp', 'Module_Temp',
+        'AC_Power', 'AC_Voltage', 'AC_Frequency', 'Total_Power_P',
+      ],
       data,
-    }
+    },
   }
 }
