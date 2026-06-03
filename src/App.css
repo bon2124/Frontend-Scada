@@ -1,0 +1,90 @@
+#root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+}
+
+.card {
+  border: none;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+/* .card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15) !important;
+} */
+
+.chart-container::-webkit-scrollbar {
+  height: 8px;
+}
+
+.chart-container::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.chart-container::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+/* .chart-container::-webkit-scrollbar-thumb:hover {
+  background: #555;
+} */
+
+/* Sidebar styles */
+.sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  z-index: 1000;
+}
+
+.sidebar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+  background: #2c3034;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+  background: #495057;
+  border-radius: 3px;
+}
+
+/* Responsive table */
+@media (max-width: 768px) {
+  .table-responsive {
+    font-size: 0.875rem;
+  }
+  
+  .sidebar {
+    position: fixed !important;
+    height: 100vh;
+  }
+  
+  .sidebar.collapsed {
+    width: 0 !important;
+    overflow: hidden;
+  }
+}
+
+/* Animation for gauges */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.card {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+
