@@ -13,6 +13,563 @@ import {
     ResponsiveContainer,
 } from 'recharts'
 
+/* ─────────────────────────────────────────────
+   LED Indicator
+───────────────────────────────────────────── */
+const LED = ({
+    active,
+    col,
+    label,
+}: {
+    active: boolean
+    col: string
+    label: string
+}) => (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+        <span
+            style={{
+                fontSize: 8,
+                fontWeight: 700,
+                color: active ? col : '#999',
+                letterSpacing: 0.8,
+                textTransform: 'uppercase',
+                transition: 'color 0.3s',
+            }}
+        >
+            {label}
+        </span>
+        <div
+            style={{
+                width: 18,
+                height: 18,
+                borderRadius: '50%',
+                background: active
+                    ? `radial-gradient(circle at 35% 35%, ${col}ff, ${col}88)`
+                    : 'radial-gradient(circle at 35% 35%, #e0e0e0, #b0b0b0)',
+                boxShadow: active
+                    ? `0 0 10px ${col}88, 0 0 4px ${col}cc, inset 0 1px 2px rgba(255,255,255,0.4)`
+                    : 'inset 0 1px 2px rgba(255,255,255,0.3), 0 1px 3px rgba(0,0,0,0.15)',
+                border: `1.5px solid ${active ? col + '99' : '#ccc'}`,
+                transition: 'all 0.4s ease',
+            }}
+        />
+    </div>
+)
+
+/* ─────────────────────────────────────────────
+   Thermometer Component
+───────────────────────────────────────────── */
+const Thermometer = ({
+    value,
+    max = 100,
+    label,
+    unit = '°C',
+    color,
+    gradientId,
+}: {
+    value: number
+    max?: number
+    label: string
+    unit?: string
+    color: string
+    gradientId: string
+}) => {
+    const pct   = Math.min(Math.max(value / max, 0), 1)
+    const tubeH = 190
+    const tubeX = 30        // left edge of tube
+    const tubeW = 16        // tube width
+    const tubeY = 8         // top of tube
+    const fillH = tubeH * pct
+    const fillY = tubeY + (tubeH - fillH)
+    const bulbCX = tubeX + tubeW / 2   // = 38
+    const bulbCY = tubeY + tubeH + 20  // below tube
+    const bulbR  = 13
+    const svgW   = 75
+    const svgH   = bulbCY + bulbR + 6  // total SVG height
+    const labelX = tubeX + tubeW + 12  // right of tube, next to tick marks
+    const ticks  = [0, 20, 40, 60, 80, 100]
+
+    return (
+        <div
+            style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 6,
+                minWidth: 130,
+            }}
+        >
+            {/* Title label */}
+            <span
+                style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: '#444',
+                    letterSpacing: 1.2,
+                    textTransform: 'uppercase',
+                    whiteSpace: 'nowrap',
+                    borderBottom: `2px solid ${color}`,
+                    paddingBottom: 3,
+                }}
+            >
+                {label}
+            </span>
+
+            {/* SVG: tube + scale labels + bulb — all in one coordinate space */}
+            <svg
+                width={svgW}
+                height={svgH}
+                style={{ overflow: 'visible' }}
+            >
+                <defs>
+                    <linearGradient id={gradientId} x1="0" y1="1" x2="0" y2="0">
+                        <stop offset="0%"   stopColor={color} stopOpacity="1"   />
+                        <stop offset="100%" stopColor={color} stopOpacity="0.6" />
+                    </linearGradient>
+                    <filter id={`glow-${gradientId}`}>
+                        <feGaussianBlur stdDeviation="1.5" result="blur" />
+                        <feMerge>
+                            <feMergeNode in="blur" />
+                            <feMergeNode in="SourceGraphic" />
+                        </feMerge>
+                    </filter>
+                </defs>
+
+                {/* Tube shadow */}
+                <rect
+                    x={tubeX + 1} y={tubeY + 1}
+                    width={tubeW} height={tubeH}
+                    rx={8}
+                    fill="rgba(0,0,0,0.05)"
+                />
+                {/* Tube background */}
+                <rect
+                    x={tubeX} y={tubeY}
+                    width={tubeW} height={tubeH}
+                    rx={8}
+                    fill="#efefef"
+                    stroke="#d0d0d0"
+                    strokeWidth={1.5}
+                />
+
+                {/* Scale labels + tick marks — both at same y so perfectly aligned */}
+                {ticks.map(v => {
+                    const y = tubeY + tubeH - (tubeH * v / 100)
+                    return (
+                        <g key={v}>
+                            {/* Label left of tube */}
+                            <text
+                                x={labelX}
+                                y={y}
+                                textAnchor="start"
+                                dominantBaseline="middle"
+                                fontSize={8}
+                                fontFamily="monospace"
+                                fill="#999"
+                            >
+                                {v}
+                            </text>
+                            {/* Tick mark right of tube */}
+                            <line
+                                x1={tubeX + tubeW}
+                                y1={y}
+                                x2={tubeX + tubeW + (v % 40 === 0 ? 6 : 4)}
+                                y2={y}
+                                stroke="#ccc"
+                                strokeWidth={v % 40 === 0 ? 1.5 : 1}
+                            />
+                        </g>
+                    )
+                })}
+
+                {/* Liquid fill */}
+                {fillH > 0 && (
+                    <rect
+                        x={tubeX + 1}
+                        y={fillY}
+                        width={tubeW - 2}
+                        height={fillH}
+                        rx={6}
+                        fill={`url(#${gradientId})`}
+                        filter={`url(#glow-${gradientId})`}
+                        style={{ transition: 'all 0.7s ease' }}
+                    />
+                )}
+
+                {/* Glass shine */}
+                <rect
+                    x={tubeX + 3}
+                    y={tubeY + 3}
+                    width={4}
+                    height={tubeH - 10}
+                    rx={2}
+                    fill="white"
+                    opacity={0.3}
+                />
+
+                {/* Bulb outer glow */}
+                <circle cx={bulbCX} cy={bulbCY} r={bulbR + 4} fill={color} opacity={0.12} />
+                {/* Bulb fill */}
+                <circle cx={bulbCX} cy={bulbCY} r={bulbR} fill={color} stroke="#ccc" strokeWidth={1.5} />
+                {/* Bulb shine */}
+                <circle cx={bulbCX - 4} cy={bulbCY - 4} r={3.5} fill="white" opacity={0.35} />
+            </svg>
+
+            {/* Digital readout */}
+            <div
+                style={{
+                    background: '#1e293b',
+                    border: `1.5px solid #334155`,
+                    borderRadius: 6,
+                    padding: '5px 12px',
+                    fontFamily: '"Courier New", monospace',
+                    fontSize: 17,
+                    fontWeight: 700,
+                    color: '#f8fafc',
+                    minWidth: 80,
+                    textAlign: 'center',
+                    boxShadow: `0 2px 8px rgba(0,0,0,0.15)`,
+                    letterSpacing: 1,
+                    display: 'flex',
+                    alignItems: 'baseline',
+                    justifyContent: 'center',
+                    gap: 4,
+                }}
+            >
+                <span>{isNaN(value) ? '--.-' : value.toFixed(1)}</span>
+                <span style={{ fontSize: 15, fontWeight: 700, color: '#94a3b8' }}>{unit}</span>
+            </div>
+        </div>
+    )
+}
+
+
+/* ─────────────────────────────────────────────
+   Semicircular Gauge
+───────────────────────────────────────────── */
+const SemiGauge = ({ value, max = 1000 }: { value: number; max?: number }) => {
+    const pct = Math.min(Math.max(value / max, 0), 1)
+    const startAngle = 215
+    const endAngle = 325
+    const sweep = endAngle - startAngle
+    const angle = startAngle + sweep * pct
+
+    const toRad = (deg: number) => (deg * Math.PI) / 180
+    const cx = 155, cy = 155, r = 110
+
+    const nLen = 95
+    const nx = cx + nLen * Math.cos(toRad(angle))
+    const ny = cy + nLen * Math.sin(toRad(angle))
+
+    const colorStops = [
+        { pct: 0,   color: '#1e88e5' }, // 0   – 200  : Blue
+        { pct: 0.2, color: '#43a047' }, // 200 – 400  : Green
+        { pct: 0.4, color: '#fdd835' }, // 400 – 600  : Yellow
+        { pct: 0.6, color: '#fb8c00' }, // 600 – 800  : Orange
+        { pct: 0.8, color: '#e53935' }, // 800 – 1000 : Red
+        { pct: 1,   color: '#e53935' }, // end cap
+    ]
+
+    const arcPath = (start: number, end: number, radius: number = r) => {
+        const sp = { x: cx + radius * Math.cos(toRad(start)), y: cy + radius * Math.sin(toRad(start)) }
+        const ep = { x: cx + radius * Math.cos(toRad(end)),   y: cy + radius * Math.sin(toRad(end)) }
+        const large = end - start > 180 ? 1 : 0
+        return `M ${sp.x} ${sp.y} A ${radius} ${radius} 0 ${large} 1 ${ep.x} ${ep.y}`
+    }
+
+    const ticks = [0, 200, 400, 600, 800, 1000]
+    const minorTicks = [100, 300, 500, 700, 900]
+
+    return (
+        <svg width={310} height={205} viewBox="0 0 310 205">
+            <defs>
+                <filter id="gauge-shadow">
+                    <feDropShadow dx="0" dy="2" stdDeviation="3" floodOpacity="0.15" />
+                </filter>
+                <filter id="needle-glow">
+                    <feGaussianBlur stdDeviation="1" result="blur" />
+                    <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+                </filter>
+            </defs>
+
+            {/* Panel background */}
+            <rect x={2} y={2} width={306} height={201} rx={10}
+                fill="white" stroke="#e8e8e8" strokeWidth={1.5}
+                filter="url(#gauge-shadow)"
+            />
+
+            {/* Track shadow */}
+            <path d={arcPath(startAngle, endAngle)} fill="none" stroke="#e0e0e0" strokeWidth={17} strokeLinecap="round" />
+            {/* Track */}
+            <path d={arcPath(startAngle, endAngle)} fill="none" stroke="#ececec" strokeWidth={15} strokeLinecap="round" />
+
+            {/* Colored arc segments */}
+            {colorStops.slice(0, -1).map((stop, i) => {
+                const next = colorStops[i + 1]
+                const s = startAngle + sweep * stop.pct
+                const e = startAngle + sweep * next.pct
+                return (
+                    <path
+                        key={i}
+                        d={arcPath(s, e)}
+                        fill="none"
+                        stroke={stop.color}
+                        strokeWidth={13}
+                        strokeLinecap="butt"
+                        opacity={0.9}
+                    />
+                )
+            })}
+
+            {/* Active zone highlight */}
+            <path
+                d={arcPath(startAngle, startAngle + sweep * pct)}
+                fill="none"
+                stroke="rgba(255,255,255,0.25)"
+                strokeWidth={13}
+                strokeLinecap="butt"
+            />
+
+            {/* Major tick marks + labels */}
+            {ticks.map(v => {
+                const a = startAngle + sweep * (v / max)
+                const inner = r - 18
+                const outer = r + 2
+                const labelR = r + 20
+                const xi = cx + inner * Math.cos(toRad(a))
+                const yi = cy + inner * Math.sin(toRad(a))
+                const xo = cx + outer * Math.cos(toRad(a))
+                const yo = cy + outer * Math.sin(toRad(a))
+                const xl = cx + labelR * Math.cos(toRad(a))
+                const yl = cy + labelR * Math.sin(toRad(a))
+                return (
+                    <g key={v}>
+                        <line x1={xi} y1={yi} x2={xo} y2={yo} stroke="#888" strokeWidth={2.5} />
+                        <text
+                            x={xl} y={yl}
+                            textAnchor="middle"
+                            dominantBaseline="middle"
+                            fontSize={9}
+                            fontFamily="monospace"
+                            fontWeight="600"
+                            fill="#555"
+                        >
+                            {v}
+                        </text>
+                    </g>
+                )
+            })}
+
+            {/* Minor tick marks */}
+            {minorTicks.map(v => {
+                const a = startAngle + sweep * (v / max)
+                const inner = r - 8
+                const outer = r + 1
+                const xi = cx + inner * Math.cos(toRad(a))
+                const yi = cy + inner * Math.sin(toRad(a))
+                const xo = cx + outer * Math.cos(toRad(a))
+                const yo = cy + outer * Math.sin(toRad(a))
+                return (
+                    <line key={v} x1={xi} y1={yi} x2={xo} y2={yo} stroke="#bbb" strokeWidth={1} />
+                )
+            })}
+
+            {/* Center hub */}
+            <circle cx={cx} cy={cy} r={10} fill="#e8e8e8" stroke="#ccc" strokeWidth={1} />
+
+            {/* Needle shadow */}
+            <line
+                x1={cx} y1={cy} x2={nx + 1} y2={ny + 1}
+                stroke="rgba(0,0,0,0.1)" strokeWidth={4} strokeLinecap="round"
+                style={{ transition: 'all 0.6s cubic-bezier(0.34,1.56,0.64,1)' }}
+            />
+            {/* Needle */}
+            <line
+                x1={cx} y1={cy} x2={nx} y2={ny}
+                stroke="#222" strokeWidth={2.5} strokeLinecap="round"
+                filter="url(#needle-glow)"
+                style={{ transition: 'all 0.6s cubic-bezier(0.34,1.56,0.64,1)' }}
+            />
+
+            {/* Hub cap */}
+            <circle cx={cx} cy={cy} r={6} fill="#444" stroke="white" strokeWidth={2} />
+            <circle cx={cx} cy={cy} r={2} fill="#888" />
+
+        </svg>
+    )
+}
+
+/* ─────────────────────────────────────────────
+   LabVIEW Panel
+───────────────────────────────────────────── */
+const LabViewPanel = ({ weatherData }: { weatherData: WeatherData }) => {
+    const irr = weatherData.Irradiance
+    const amb = weatherData.Ambient_Temp
+    const mod = weatherData.Module_Temp
+
+    const irrHigh   = irr >= 800
+    const irrNormal = irr >= 400 && irr < 800
+
+    const ambHigh   = amb >= 35
+    const ambNormal = amb >= 15 && amb < 35
+    const ambLow    = amb < 15
+
+    const modHigh   = mod >= 60
+    const modNormal = mod >= 30 && mod < 60
+    const modLow    = mod < 30
+
+
+    // Irradiance quality label
+    const irrLabel = irrHigh ? 'Excellent' : irrNormal ? 'Good' : 'Low'
+    const irrColor = irrHigh ? '#43a047' : irrNormal ? '#fb8c00' : '#e53935'
+
+    return (
+        <div
+            style={{
+                background: 'linear-gradient(180deg, #fafafa 0%, #f2f2f2 100%)',
+                border: '1px solid #e0e0e0',
+                borderRadius: 12,
+                padding: '6px 32px 8px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 16,
+                boxShadow: '0 2px 16px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.8)',
+            }}
+        >
+            {/* ── 1. Left Thermometer — Outside Temperature ── */}
+            <Thermometer
+                value={amb}
+                max={100}
+                label="Outside Temperature"
+                color="#2196f3"
+                gradientId="grad-amb"
+            />
+
+            {/* ── 2. Ambient LED column ── */}
+            <div
+                style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 12,
+                    padding: '10px 14px',
+                    background: 'white',
+                    borderRadius: 10,
+                    border: '1px solid #eee',
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+                    alignSelf: 'center',
+                }}
+            >
+                <LED active={ambHigh}   col="#e53935" label="HIGH"   />
+                <LED active={ambNormal} col="#43a047" label="NORMAL" />
+                <LED active={ambLow}    col="#1e88e5" label="LOW"    />
+            </div>
+
+            {/* ── 3. Center — Solar Irradiance gauge ── */}
+            <div
+                style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 4,
+                    flex: 1,
+                }}
+            >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span
+                        style={{
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: '#444',
+                            letterSpacing: 1.5,
+                            textTransform: 'uppercase',
+                        }}
+                    >
+                        Solar Irradiance
+                    </span>
+                    <span
+                        style={{
+                            fontSize: 9,
+                            fontWeight: 700,
+                            color: irrColor,
+                            background: irrColor + '18',
+                            border: `1px solid ${irrColor}44`,
+                            borderRadius: 20,
+                            padding: '2px 8px',
+                            letterSpacing: 0.5,
+                            textTransform: 'uppercase',
+                        }}
+                    >
+                        {irrLabel}
+                    </span>
+                </div>
+
+
+                <SemiGauge value={irr} max={1000} />
+
+                {/* Digital readout — same style as thermometers */}
+                <div
+                    style={{
+                        background: '#1e293b',
+                        border: '1.5px solid #334155',
+                        borderRadius: 6,
+                        padding: '5px 12px',
+                        fontFamily: '"Courier New", monospace',
+                        fontSize: 17,
+                        fontWeight: 700,
+                        color: '#f8fafc',
+                        minWidth: 80,
+                        textAlign: 'center',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                        letterSpacing: 1,
+                        display: 'flex',
+                        alignItems: 'baseline',
+                        justifyContent: 'center',
+                        gap: 4,
+                    }}
+                >
+                    <span>{irr.toFixed(0)}</span>
+                    <span style={{ fontSize: 15, fontWeight: 700, color: '#94a3b8' }}>W/m²</span>
+                </div>
+
+            </div>
+
+            {/* ── 4. Panel LED column ── */}
+            <div
+                style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 12,
+                    padding: '10px 14px',
+                    background: 'white',
+                    borderRadius: 10,
+                    border: '1px solid #eee',
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+                    alignSelf: 'center',
+                }}
+            >
+                <LED active={modHigh}   col="#e53935" label="HIGH"   />
+                <LED active={modNormal} col="#43a047" label="NORMAL" />
+                <LED active={modLow}    col="#1e88e5" label="LOW"    />
+            </div>
+
+            {/* ── 5. Right Thermometer — Panel Temperature ── */}
+            <Thermometer
+                value={mod}
+                max={100}
+                label="Panel Temperature"
+                color="#ef5350"
+                gradientId="grad-mod"
+            />
+        </div>
+    )
+}
+
+/* ─────────────────────────────────────────────
+   Main Component
+───────────────────────────────────────────── */
 const EnvironmentalMonitoring = () => {
     const [weatherData, setWeatherData] = useState<WeatherData | null>(null)
     const [weatherHistory, setWeatherHistory] = useState<WeatherData[]>([])
@@ -39,7 +596,6 @@ const EnvironmentalMonitoring = () => {
 
             // Calculate start time based on selected period
             if (timePeriod === 'today') {
-                // Get data from start of today (00:00:00) in local timezone
                 const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0)
                 startTime = startOfDay.toISOString()
                 console.log(`Today time range: ${startTime} to ${now.toISOString()}`)
@@ -70,22 +626,21 @@ const EnvironmentalMonitoring = () => {
 
                 const timeSeriesResponse = await weatherApi.getTimeSeries({
                     deviceId: 'weather',
-                    metrics: 'Ambient_Temp,Irradiance,Module_Temp', // Correct metric names from API docs
+                    metrics: 'Ambient_Temp,Irradiance,Module_Temp',
                     startTime,
                     endTime: now.toISOString(),
                     interval: timePeriod === 'today' ? '1h' : timePeriod === '7days' ? '4h' : '1d',
-                    aggregateType: 'avg' // Fixed: use 'avg' instead of 'mean'
+                    aggregateType: 'avg'
                 })
 
                 console.log('Time-series API response:', timeSeriesResponse.data)
                 console.log('Sample time-series data points:', timeSeriesResponse.data.data.slice(0, 5))
                 console.log('Full time-series data:', timeSeriesResponse.data.data)
 
-                // Transform time-series response to WeatherData format
                 const transformedData: WeatherData[] = timeSeriesResponse.data.data.map(item => ({
                     Ambient_Temp: typeof item.Ambient_Temp === 'number' ? item.Ambient_Temp : parseFloat(item.Ambient_Temp as string) || 0,
-                    Irradiance: typeof item.Irradiance === 'number' ? item.Irradiance : parseFloat(item.Irradiance as string) || 0,
-                    Module_Temp: typeof item.Module_Temp === 'number' ? item.Module_Temp : parseFloat(item.Module_Temp as string) || 0,
+                    Irradiance:   typeof item.Irradiance   === 'number' ? item.Irradiance   : parseFloat(item.Irradiance   as string) || 0,
+                    Module_Temp:  typeof item.Module_Temp  === 'number' ? item.Module_Temp  : parseFloat(item.Module_Temp  as string) || 0,
                     time: item.timestamp
                 }))
 
@@ -97,6 +652,7 @@ const EnvironmentalMonitoring = () => {
                     ambientTemp: d.Ambient_Temp,
                     moduleTemp: d.Module_Temp
                 })))
+
                 if (transformedData.length > 0) {
                     setWeatherHistory(transformedData)
                     return // Use time-series data successfully
@@ -125,15 +681,13 @@ const EnvironmentalMonitoring = () => {
                 limit
             })
 
-            // Log response for debugging
             console.log(`Weather history for ${timePeriod}:`, response.data.length, 'rows')
             if (response.data.length > 0) {
                 console.log('Time range in response:', response.data[0].time, 'to', response.data[response.data.length - 1].time)
                 console.log('Sample data:', response.data.slice(0, 3))
 
-                // Check if we got data from the right time period
                 const firstDataTime = new Date(response.data[0].time)
-                const lastDataTime = new Date(response.data[response.data.length - 1].time)
+                const lastDataTime  = new Date(response.data[response.data.length - 1].time)
                 const requestedStartTime = new Date(startTime)
 
                 console.log('Requested start time:', requestedStartTime.toISOString())
@@ -167,7 +721,6 @@ const EnvironmentalMonitoring = () => {
             case 'today': {
                 // For time-series data, it's already hourly aggregated, just format time
                 if (weatherHistory.length > 0 && weatherHistory[0].time.includes('T') && weatherHistory[0].time.includes('Z')) {
-                    // Time-series API data - already aggregated hourly
                     processedData = weatherHistory.map(item => {
                         const date = new Date(item.time)
                         return {
@@ -176,9 +729,9 @@ const EnvironmentalMonitoring = () => {
                                 minute: '2-digit',
                                 hour12: false
                             }),
-                            irradiance: item.Irradiance,
+                            irradiance:  item.Irradiance,
                             ambientTemp: item.Ambient_Temp,
-                            moduleTemp: item.Module_Temp
+                            moduleTemp:  item.Module_Temp
                         }
                     })
                     console.log('Time-series processed data:', processedData)
@@ -189,7 +742,7 @@ const EnvironmentalMonitoring = () => {
                         moduleTemp: d.moduleTemp
                     })))
                 } else {
-                    // Fallback history API data - needs aggregation
+                    // Fallback history API data — needs aggregation
                     const hourlyData = new Map<number, { sum: { irradiance: number; ambientTemp: number; moduleTemp: number }; count: number }>()
 
                     console.log('Processing today data, total items:', weatherHistory.length)
@@ -207,42 +760,35 @@ const EnvironmentalMonitoring = () => {
                         }
 
                         const existing = hourlyData.get(hour)!
-                        existing.sum.irradiance += item.Irradiance
+                        existing.sum.irradiance  += item.Irradiance
                         existing.sum.ambientTemp += item.Ambient_Temp
-                        existing.sum.moduleTemp += item.Module_Temp
+                        existing.sum.moduleTemp  += item.Module_Temp
                         existing.count++
                     })
 
-                    // Fill missing hours with 0 values from start of day to current hour
+                    // Fill missing hours with 0 values
                     const currentHour = new Date().getHours()
                     const completeHourlyData = new Map<number, { irradiance: number; ambientTemp: number; moduleTemp: number }>()
 
                     for (let hour = 0; hour <= currentHour; hour++) {
                         if (hourlyData.has(hour)) {
-                            // Use actual data if available
                             const data = hourlyData.get(hour)!
                             completeHourlyData.set(hour, {
-                                irradiance: data.count > 0 ? data.sum.irradiance / data.count : 0,
+                                irradiance:  data.count > 0 ? data.sum.irradiance  / data.count : 0,
                                 ambientTemp: data.count > 0 ? data.sum.ambientTemp / data.count : 0,
-                                moduleTemp: data.count > 0 ? data.sum.moduleTemp / data.count : 0
+                                moduleTemp:  data.count > 0 ? data.sum.moduleTemp  / data.count : 0
                             })
                         } else {
-                            // Set missing hours to 0 (no fake data)
-                            completeHourlyData.set(hour, {
-                                irradiance: 0,
-                                ambientTemp: 0,
-                                moduleTemp: 0
-                            })
+                            completeHourlyData.set(hour, { irradiance: 0, ambientTemp: 0, moduleTemp: 0 })
                         }
                     }
 
-                    // Create hourly data points from 0 to current hour
                     processedData = Array.from(completeHourlyData.entries())
                         .map(([hour, data]) => ({
                             time: `${hour.toString().padStart(2, '0')}:00`,
-                            irradiance: data.irradiance,
+                            irradiance:  data.irradiance,
                             ambientTemp: data.ambientTemp,
-                            moduleTemp: data.moduleTemp
+                            moduleTemp:  data.moduleTemp
                         }))
                         .sort((a, b) => a.time.localeCompare(b.time))
 
@@ -252,12 +798,11 @@ const EnvironmentalMonitoring = () => {
             }
 
             case '7days': {
-                // Group by day for 7-day view
                 const dailyData = new Map<string, { sum: { irradiance: number; ambientTemp: number; moduleTemp: number }; count: number }>()
 
                 weatherHistory.forEach(item => {
-                    const date = new Date(item.time)
-                    const dateKey = date.toISOString().split('T')[0] // YYYY-MM-DD
+                    const date    = new Date(item.time)
+                    const dateKey = date.toISOString().split('T')[0]
 
                     if (!dailyData.has(dateKey)) {
                         dailyData.set(dateKey, {
@@ -267,9 +812,9 @@ const EnvironmentalMonitoring = () => {
                     }
 
                     const existing = dailyData.get(dateKey)!
-                    existing.sum.irradiance += item.Irradiance
+                    existing.sum.irradiance  += item.Irradiance
                     existing.sum.ambientTemp += item.Ambient_Temp
-                    existing.sum.moduleTemp += item.Module_Temp
+                    existing.sum.moduleTemp  += item.Module_Temp
                     existing.count++
                 })
 
@@ -277,13 +822,10 @@ const EnvironmentalMonitoring = () => {
                     .map(([dateKey, data]) => {
                         const date = new Date(dateKey)
                         return {
-                            time: date.toLocaleDateString('en-US', {
-                                month: 'short',
-                                day: 'numeric'
-                            }),
-                            irradiance: data.count > 0 ? data.sum.irradiance / data.count : 0,
+                            time: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                            irradiance:  data.count > 0 ? data.sum.irradiance  / data.count : 0,
                             ambientTemp: data.count > 0 ? data.sum.ambientTemp / data.count : 0,
-                            moduleTemp: data.count > 0 ? data.sum.moduleTemp / data.count : 0
+                            moduleTemp:  data.count > 0 ? data.sum.moduleTemp  / data.count : 0
                         }
                     })
                     .sort((a, b) => a.time.localeCompare(b.time))
@@ -291,11 +833,10 @@ const EnvironmentalMonitoring = () => {
             }
 
             case '30days': {
-                // Group by date for 30-day view
                 const monthlyData = new Map<string, { sum: { irradiance: number; ambientTemp: number; moduleTemp: number }; count: number }>()
 
                 weatherHistory.forEach(item => {
-                    const date = new Date(item.time)
+                    const date    = new Date(item.time)
                     const dateKey = `${date.getMonth() + 1}/${date.getDate()}`
 
                     if (!monthlyData.has(dateKey)) {
@@ -306,18 +847,18 @@ const EnvironmentalMonitoring = () => {
                     }
 
                     const existing = monthlyData.get(dateKey)!
-                    existing.sum.irradiance += item.Irradiance
+                    existing.sum.irradiance  += item.Irradiance
                     existing.sum.ambientTemp += item.Ambient_Temp
-                    existing.sum.moduleTemp += item.Module_Temp
+                    existing.sum.moduleTemp  += item.Module_Temp
                     existing.count++
                 })
 
                 processedData = Array.from(monthlyData.entries())
                     .map(([dateKey, data]) => ({
                         time: dateKey,
-                        irradiance: data.count > 0 ? data.sum.irradiance / data.count : 0,
+                        irradiance:  data.count > 0 ? data.sum.irradiance  / data.count : 0,
                         ambientTemp: data.count > 0 ? data.sum.ambientTemp / data.count : 0,
-                        moduleTemp: data.count > 0 ? data.sum.moduleTemp / data.count : 0
+                        moduleTemp:  data.count > 0 ? data.sum.moduleTemp  / data.count : 0
                     }))
                     .sort((a, b) => {
                         const [aMonth, aDay] = a.time.split('/').map(Number)
@@ -329,19 +870,34 @@ const EnvironmentalMonitoring = () => {
         }
 
         setChartData(processedData)
-    }, [weatherHistory, timePeriod])    // Custom Tooltip Component for Chart
-    const CustomTooltip = ({ active, payload, label }: {
+    }, [weatherHistory, timePeriod])
+
+    // Custom Tooltip for Chart
+    const CustomTooltip = ({
+        active,
+        payload,
+        label,
+    }: {
         active?: boolean
         payload?: Array<{ color: string; name: string; value: number; unit?: string }>
         label?: string
     }) => {
         if (active && payload && payload.length) {
             return (
-                <div className="bg-white p-3 border rounded shadow-sm">
-                    <p className="fw-bold mb-2">{`Time: ${label}`}</p>
+                <div
+                    style={{
+                        background: 'white',
+                        border: '1px solid #e0e0e0',
+                        borderRadius: 8,
+                        padding: '8px 12px',
+                        boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+                    }}
+                >
+                    <p style={{ fontWeight: 700, marginBottom: 6, color: '#333', fontSize: 12 }}>{`🕐 ${label}`}</p>
                     {payload.map((pld, index: number) => (
-                        <p key={index} style={{ color: pld.color }} className="mb-1">
-                            {`${pld.name}: ${pld.value.toFixed(1)}${pld.unit || ''}`}
+                        <p key={index} style={{ color: pld.color, marginBottom: 3, fontSize: 11 }}>
+                            {`${pld.name}: `}
+                            <strong>{`${pld.value.toFixed(1)}${pld.unit || ''}`}</strong>
                         </p>
                     ))}
                 </div>
@@ -355,46 +911,20 @@ const EnvironmentalMonitoring = () => {
         fetchWeatherData()
         fetchWeatherHistory()
 
-        // Update both current weather data and chart history every 30 seconds (good for demo)
         const interval = setInterval(() => {
             fetchWeatherData()
             fetchWeatherHistory()
         }, 30000)
 
         return () => clearInterval(interval)
-    }, [fetchWeatherData, fetchWeatherHistory, timePeriod]) // Re-fetch when time period changes
+    }, [fetchWeatherData, fetchWeatherHistory, timePeriod])
 
-    // Additional useEffect for initial data fetch
+    // Additional initial fetch
     useEffect(() => {
         fetchWeatherData()
         fetchWeatherHistory()
     }, [fetchWeatherData, fetchWeatherHistory])
 
-    // Get irradiance level status
-    const getIrradianceStatus = (value: number) => {
-        if (value >= 900) return { color: 'success', text: 'Excellent' }
-        if (value >= 700) return { color: 'primary', text: 'Good' }
-        if (value >= 500) return { color: 'warning', text: 'Moderate' }
-        return { color: 'danger', text: 'Low' }
-    }
-
-    // Get ambient temperature status
-    const getAmbientTempStatus = (temp: number) => {
-        if (temp >= 35) return { color: 'danger', text: 'Hot' }
-        if (temp >= 25) return { color: 'warning', text: 'Warm' }
-        if (temp >= 15) return { color: 'primary', text: 'Mild' }
-        return { color: 'success', text: 'Cool' }
-    }
-
-    // Get module temperature status
-    const getModuleTempStatus = (module: number, ambient: number) => {
-        const diff = module - ambient
-        if (diff > 25) return { color: 'danger', text: 'Overheating Risk', icon: 'thermometer-high' }
-        if (diff > 20) return { color: 'warning', text: 'High', icon: 'thermometer-half' }
-        return { color: 'success', text: 'Normal', icon: 'thermometer' }
-    }
-
-    // Don't render if no weather data
     if (!weatherData) {
         return (
             <div className="card shadow-sm">
@@ -404,204 +934,157 @@ const EnvironmentalMonitoring = () => {
                         Environmental Monitoring
                     </h5>
                 </div>
-                <div className="card-body text-center">
+                <div className="card-body text-center py-5">
                     <div className="spinner-border text-warning" role="status">
                         <span className="visually-hidden">Loading...</span>
                     </div>
-                    <p className="mt-2 text-muted">Loading weather data...</p>
+                    <p className="mt-3 text-muted">Loading weather data...</p>
                 </div>
             </div>
         )
     }
 
-    const irradianceStatus = getIrradianceStatus(weatherData.Irradiance)
-    const moduleTempStatus = getModuleTempStatus(weatherData.Module_Temp, weatherData.Ambient_Temp)
-    const ambientTempStatus = getAmbientTempStatus(weatherData.Ambient_Temp)
-
     return (
-        <>
-
-            {/* Weather Data */}
-            <div className="card shadow-sm">
-                <div className="card-header bg-warning text-dark">
-                    <h5 className="mb-0">
-                        <i className="bi bi-sun me-2"></i>
-                        Environmental Monitoring
-                    </h5>
-                </div>
-                <div className="card-body">
-                    <div className="row g-3">
-                        {/* Irradiance */}
-                        <div className="col-lg-4 col-md-6">
-                            <div className="border rounded p-3 h-100 bg-light">
-                                <div className="d-flex align-items-center justify-content-between mb-3">
-                                    <h6 className="mb-0">
-                                        <i className="bi bi-brightness-high text-warning"></i> Irradiance
-                                    </h6>
-                                    <span className={`badge bg-${irradianceStatus.color}`}>
-                                        {irradianceStatus.text}
-                                    </span>
-                                </div>
-                                <div className="text-center py-4">
-                                    <div className="mb-3">
-                                        <i className="bi bi-brightness-high"
-                                            style={{
-                                                fontSize: '3rem', color: irradianceStatus.color === 'danger' ? '#dc3545' :
-                                                    irradianceStatus.color === 'warning' ? '#ffc107' :
-                                                        irradianceStatus.color === 'primary' ? '#0d6efd' : '#28a745'
-                                            }}></i>
-                                    </div>
-                                    <h1 className={`display-4 mb-0 text-${irradianceStatus.color}`}>
-                                        {weatherData.Irradiance.toFixed(0)}
-                                    </h1>
-                                    <small className="text-muted">W/m² Solar Irradiance</small>
-                                </div>
-                                <div className="mt-3 small text-muted">
-                                    <i className="bi bi-info-circle"></i> Solar radiation intensity
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Ambient Temperature */}
-                        <div className="col-lg-4 col-md-6">
-                            <div className="border rounded p-3 h-100 bg-light">
-                                <div className="d-flex align-items-center justify-content-between mb-3">
-                                    <h6 className="mb-0">
-                                        <i className={`bi bi-thermometer-sun text-${ambientTempStatus.color}`}></i> Ambient Temperature
-                                    </h6>
-                                    <span className={`badge bg-${ambientTempStatus.color}`}>
-                                        {ambientTempStatus.text}
-                                    </span>
-                                </div>
-                                <div className="text-center py-4">
-                                    <div className="mb-3">
-                                        <i className="bi bi-thermometer-sun" style={{
-                                            fontSize: '3rem',
-                                            color: ambientTempStatus.color === 'danger' ? '#dc3545' :
-                                                ambientTempStatus.color === 'warning' ? '#ffc107' :
-                                                    ambientTempStatus.color === 'primary' ? '#0d6efd' : '#28a745'
-                                        }}></i>
-                                    </div>
-                                    <h1 className={`display-4 mb-0 text-${ambientTempStatus.color}`}>{weatherData.Ambient_Temp.toFixed(1)}°C</h1>
-                                    <small className="text-muted">Environmental Temperature</small>
-                                </div>
-                                <div className="mt-3 small text-muted">
-                                    <i className="bi bi-info-circle"></i> Ambient temperature in the shade
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Module Temperature */}
-                        <div className="col-lg-4 col-md-12">
-                            <div className="border rounded p-3 h-100 bg-light">
-                                <div className="d-flex align-items-center justify-content-between mb-3">
-                                    <h6 className="mb-0">
-                                        <i className={`bi bi-${moduleTempStatus.icon} text-${moduleTempStatus.color}`}></i> Module Temperature
-                                    </h6>
-                                    <span className={`badge bg-${moduleTempStatus.color}`}>
-                                        {moduleTempStatus.text}
-                                    </span>
-                                </div>
-                                <div className="text-center py-4">
-                                    <div className="mb-3">
-                                        <i className={`bi bi-${moduleTempStatus.icon}`}
-                                            style={{ fontSize: '3rem', color: moduleTempStatus.color === 'danger' ? '#dc3545' : moduleTempStatus.color === 'warning' ? '#ffc107' : '#28a745' }}></i>
-                                    </div>
-                                    <h1 className={`display-4 mb-0 text-${moduleTempStatus.color}`}>
-                                        {weatherData.Module_Temp.toFixed(1)}°C
-                                    </h1>
-                                    <small className="text-muted">Solar Module Temperature</small>
-                                </div>
-                                <div className="mt-3 small text-muted">
-                                    <i className="bi bi-info-circle"></i> Temperature of the solar panel surface
-                                </div>
-                            </div>
-                        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            {/* ── LabVIEW Panel Card ── */}
+            <div
+                className="card shadow-sm"
+                style={{ border: '1px solid #e8e8e8', borderRadius: 12, overflow: 'hidden' }}
+            >
+                <div
+                    className="card-header py-2"
+                    style={{
+                        background: 'linear-gradient(90deg, #f9a825 0%, #fbc02d 100%)',
+                        border: 'none',
+                    }}
+                >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <h5 className="mb-0" style={{ color: '#333', fontWeight: 700, fontSize: 14, letterSpacing: 0.5 }}>
+                            <i className="bi bi-sun-fill me-2" style={{ color: '#e65100' }}></i>
+                            Environmental Monitoring
+                        </h5>
+                        <span
+                            style={{
+                                fontSize: 10,
+                                color: '#5d4037',
+                                background: 'rgba(255,255,255,0.4)',
+                                borderRadius: 20,
+                                padding: '2px 10px',
+                                fontWeight: 600,
+                                letterSpacing: 0.5,
+                            }}
+                        >
+                            ● LIVE
+                        </span>
                     </div>
+                </div>
+                <div className="card-body p-1" style={{ background: '#f7f7f7' }}>
+                    <LabViewPanel weatherData={weatherData} />
                 </div>
             </div>
 
-            {/* Location Map and Environmental History in one row */}
-            <div className="row mt-3 g-3">
-                {/* Location Map */}
-                <div className="col-lg-6">
-                    <div className="card shadow-sm h-100">
-                        <div className="card-header bg-danger text-white">
-                            <h6 className="mb-0">
-                                <i className="bi bi-geo-alt-fill me-2"></i>
+            {/* ── Location Map + Environmental History ── */}
+            <div className="row g-2" style={{ height: 350, marginTop: 2 }}>
+
+                {/* Map — col 4 */}
+                <div className="col-lg-4" style={{ height: 350 }}>
+                    <div
+                        className="card h-100"
+                        style={{ border: '1px solid #e8e8e8', borderRadius: 12, overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}
+                    >
+                        <div
+                            className="card-header py-2"
+                            style={{
+                                background: 'linear-gradient(90deg, #c62828, #e53935)',
+                                border: 'none',
+                            }}
+                        >
+                            <h6 className="mb-0" style={{ color: 'white', fontSize: 12, fontWeight: 700, letterSpacing: 0.5 }}>
+                                <i className="bi bi-geo-alt-fill me-1"></i>
                                 Solar Plant Location
                             </h6>
                         </div>
-                        <div className="card-body p-2">
-                            <div className="ratio ratio-16x9">
-                                <iframe
-                                    src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d30670.74003548546!2d108.1117601743164!3d16.0736606!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x314218d68dff9545%3A0x714561e9f3a7292c!2zVHLGsOG7nW5nIMSQ4bqhaSBo4buNYyBCw6FjaCBLaG9hIC0gxJDhuqFpIGjhu41jIMSQw6AgTuG6tW5n!5e0!3m2!1svi!2s!4v1761808003776!5m2!1svi!2s"
-                                    style={{ border: 0 }}
-                                    allowFullScreen
-                                    loading="lazy"
-                                    referrerPolicy="no-referrer-when-downgrade"
-                                    title="Solar Plant Location"
-                                ></iframe>
-                            </div>
-                            <div className="mt-2 text-center">
-                                <small className="text-muted">
-                                    <i className="bi bi-building"></i> Trường Đại học Bách Khoa - Đại học Đà Nẵng
-                                </small>
-                            </div>
+                        <div
+                            className="card-body p-0"
+                            style={{ height: 'calc(100% - 38px)', overflow: 'hidden' }}
+                        >
+                            <iframe
+                                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d30670.74003548546!2d108.1117601743164!3d16.0736606!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x314218d68dff9545%3A0x714561e9f3a7292c!2zVHLGsOG7nW5nIMSQ4bqhaSBo4buNYyBCw6FjaCBLaG9hIC0gxJDhuqFpIGjhu41jIMSQw6AgTuG6tW5n!5e0!3m2!1svi!2s!4v1761808003776!5m2!1svi!2s"
+                                width="100%"
+                                height="100%"
+                                style={{ border: 0, display: 'block' }}
+                                allowFullScreen
+                                loading="lazy"
+                                referrerPolicy="no-referrer-when-downgrade"
+                                title="Solar Plant Location"
+                            />
                         </div>
                     </div>
                 </div>
 
-                {/* Environmental History */}
-                <div className="col-lg-6">
-                    <div className="card shadow-sm h-100">
-                        <div className="card-header bg-info text-white">
-                            <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                                <h6 className="mb-0">
-                                    <i className="bi bi-graph-up me-2"></i>
+                {/* Chart — col 8 */}
+                <div className="col-lg-8" style={{ height: 350 }}>
+                    <div
+                        className="card h-100"
+                        style={{ border: '1px solid #e8e8e8', borderRadius: 12, overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}
+                    >
+                        <div
+                            className="card-header py-2"
+                            style={{
+                                background: 'linear-gradient(90deg, #0077b6, #0096c7)',
+                                border: 'none',
+                            }}
+                        >
+                            <div className="d-flex justify-content-between align-items-center">
+                                <h6 className="mb-0" style={{ color: 'white', fontSize: 12, fontWeight: 700, letterSpacing: 0.5 }}>
+                                    <i className="bi bi-graph-up me-1"></i>
                                     Environmental History
                                 </h6>
-                                <div className="d-flex gap-2 flex-wrap">
-                                    {/* Chart Type Selector */}
+                                <div className="d-flex gap-2">
+                                    {/* Chart type */}
                                     <div className="btn-group btn-group-sm" role="group">
                                         <button
                                             type="button"
-                                            className={`btn ${chartType === 'line' ? 'btn-light' : 'btn-outline-light'}`}
+                                            className={`btn btn-sm ${chartType === 'line' ? 'btn-light' : 'btn-outline-light'}`}
                                             onClick={() => setChartType('line')}
                                             title="Line Chart"
+                                            style={{ fontSize: 11, padding: '2px 8px' }}
                                         >
                                             <i className="bi bi-graph-up"></i>
                                         </button>
                                         <button
                                             type="button"
-                                            className={`btn ${chartType === 'bar' ? 'btn-light' : 'btn-outline-light'}`}
+                                            className={`btn btn-sm ${chartType === 'bar' ? 'btn-light' : 'btn-outline-light'}`}
                                             onClick={() => setChartType('bar')}
                                             title="Bar Chart"
+                                            style={{ fontSize: 11, padding: '2px 8px' }}
                                         >
                                             <i className="bi bi-bar-chart-fill"></i>
                                         </button>
                                     </div>
-
-                                    {/* Time Period Selector */}
+                                    {/* Time period */}
                                     <div className="btn-group btn-group-sm" role="group">
                                         <button
                                             type="button"
-                                            className={`btn ${timePeriod === 'today' ? 'btn-light' : 'btn-outline-light'}`}
+                                            className={`btn btn-sm ${timePeriod === 'today' ? 'btn-light' : 'btn-outline-light'}`}
                                             onClick={() => setTimePeriod('today')}
+                                            style={{ fontSize: 11, padding: '2px 10px' }}
                                         >
                                             Today
                                         </button>
                                         <button
                                             type="button"
-                                            className={`btn ${timePeriod === '7days' ? 'btn-light' : 'btn-outline-light'}`}
+                                            className={`btn btn-sm ${timePeriod === '7days' ? 'btn-light' : 'btn-outline-light'}`}
                                             onClick={() => setTimePeriod('7days')}
+                                            style={{ fontSize: 11, padding: '2px 10px' }}
                                         >
                                             7 Days
                                         </button>
                                         <button
                                             type="button"
-                                            className={`btn ${timePeriod === '30days' ? 'btn-light' : 'btn-outline-light'}`}
+                                            className={`btn btn-sm ${timePeriod === '30days' ? 'btn-light' : 'btn-outline-light'}`}
                                             onClick={() => setTimePeriod('30days')}
+                                            style={{ fontSize: 11, padding: '2px 10px' }}
                                         >
                                             30 Days
                                         </button>
@@ -609,114 +1092,142 @@ const EnvironmentalMonitoring = () => {
                                 </div>
                             </div>
                         </div>
-                        <div className="card-body">
-                            {/* Chart */}
-                            <div style={{ height: '400px' }}>
-                                {weatherHistory.length === 0 ? (
-                                    <div className="d-flex justify-content-center align-items-center h-100">
-                                        <div className="text-center">
-                                            <div className="spinner-border text-info" role="status">
-                                                <span className="visually-hidden">Loading...</span>
-                                            </div>
-                                            <p className="mt-3 text-muted">Loading chart data...</p>
+
+                        <div className="card-body p-2" style={{ height: 'calc(100% - 38px)', background: 'white' }}>
+                            {weatherHistory.length === 0 ? (
+                                <div className="d-flex justify-content-center align-items-center h-100">
+                                    <div className="text-center">
+                                        <div className="spinner-border text-primary" style={{ width: '2rem', height: '2rem' }} role="status">
+                                            <span className="visually-hidden">Loading...</span>
                                         </div>
+                                        <p className="mt-2 text-muted small">Loading chart data...</p>
                                     </div>
-                                ) : (
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        {chartType === 'line' ? (
-                                            <LineChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
-                                                <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-                                                <XAxis
-                                                    dataKey="time"
-                                                    angle={timePeriod === '30days' ? -45 : 0}
-                                                    textAnchor={timePeriod === '30days' ? 'end' : 'middle'}
-                                                    height={timePeriod === '30days' ? 60 : 30}
-                                                    interval={timePeriod === 'today' ? 1 : 0}
-                                                    tick={{ fontSize: 12 }}
-                                                    stroke="#666"
-                                                />
-                                                <YAxis
-                                                    yAxisId="left"
-                                                    label={{ value: 'Irradiance (W/m²)', angle: -90, position: 'insideLeft' }}
-                                                    tick={{ fontSize: 12 }}
-                                                    stroke="#ffc107"
-                                                    domain={[0, 1000]}
-                                                />
-                                                <YAxis
-                                                    yAxisId="right"
-                                                    orientation="right"
-                                                    label={{ value: 'Temperature (°C)', angle: 90, position: 'insideRight' }}
-                                                    tick={{ fontSize: 12 }}
-                                                    stroke="#dc3545"
-                                                    domain={[0, 70]}
-                                                />
-                                                <Tooltip content={<CustomTooltip />} />
-                                                <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                                                <Line
-                                                    yAxisId="left"
-                                                    type="monotone"
-                                                    dataKey="irradiance"
-                                                    stroke="#ffc107"
-                                                    strokeWidth={3}
-                                                    name="Irradiance"
-                                                    unit=" W/m²"
-                                                    dot={{ r: 4, fill: '#ffc107', strokeWidth: 2, stroke: '#fff' }}
-                                                    activeDot={{ r: 7, fill: '#ffc107', stroke: '#fff', strokeWidth: 2 }}
-                                                />
-                                                <Line
-                                                    yAxisId="right"
-                                                    type="monotone"
-                                                    dataKey="ambientTemp"
-                                                    stroke="#0dcaf0"
-                                                    strokeWidth={2}
-                                                    name="Ambient Temp"
-                                                    unit="°C"
-                                                    dot={{ r: 3, fill: '#0dcaf0', strokeWidth: 1, stroke: '#fff' }}
-                                                    activeDot={{ r: 6 }}
-                                                />
-                                                <Line
-                                                    yAxisId="right"
-                                                    type="monotone"
-                                                    dataKey="moduleTemp"
-                                                    stroke="#dc3545"
-                                                    strokeWidth={2}
-                                                    name="Module Temp"
-                                                    unit="°C"
-                                                    dot={{ r: 3, fill: '#dc3545', strokeWidth: 1, stroke: '#fff' }}
-                                                    activeDot={{ r: 6 }}
-                                                />
-                                            </LineChart>
-                                        ) : chartType === 'bar' ? (
-                                            <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
-                                                <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-                                                <XAxis
-                                                    dataKey="time"
-                                                    angle={timePeriod === '30days' ? -45 : 0}
-                                                    textAnchor={timePeriod === '30days' ? 'end' : 'middle'}
-                                                    height={timePeriod === '30days' ? 60 : 30}
-                                                    interval={timePeriod === 'today' ? 1 : 0}
-                                                    tick={{ fontSize: 12 }}
-                                                    stroke="#666"
-                                                />
-                                                <YAxis
-                                                    label={{ value: 'Irradiance (W/m²)', angle: -90, position: 'insideLeft' }}
-                                                    tick={{ fontSize: 12 }}
-                                                    stroke="#666"
-                                                    domain={[0, 'auto']}
-                                                />
-                                                <Tooltip content={<CustomTooltip />} />
-                                                <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                                                <Bar dataKey="irradiance" fill="#ffc107" name="Irradiance (W/m²)" />
-                                            </BarChart>
-                                        ) : null}
-                                    </ResponsiveContainer>
-                                )}
-                            </div>
+                                </div>
+                            ) : (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    {chartType === 'line' ? (
+                                        <LineChart
+                                            data={chartData}
+                                            margin={{ top: 5, right: 35, left: 20, bottom: 20 }}
+                                        >
+                                            <defs>
+                                                <linearGradient id="colorIrr" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="5%" stopColor="#ffc107" stopOpacity={0.15} />
+                                                    <stop offset="95%" stopColor="#ffc107" stopOpacity={0} />
+                                                </linearGradient>
+                                            </defs>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                                            <XAxis
+                                                dataKey="time"
+                                                angle={timePeriod === '30days' ? -45 : 0}
+                                                textAnchor={timePeriod === '30days' ? 'end' : 'middle'}
+                                                height={timePeriod === '30days' ? 60 : 28}
+                                                interval={timePeriod === 'today' ? 1 : 0}
+                                                tick={{ fontSize: 10, fill: '#888' }}
+                                                stroke="#e0e0e0"
+                                                tickLine={false}
+                                            />
+                                            <YAxis
+                                                yAxisId="left"
+                                                label={{ value: 'Irradiance (W/m²)', angle: -90, position: 'insideLeft', style: { fontSize: 10, fill: '#aaa' } }}
+                                                tick={{ fontSize: 10, fill: '#888' }}
+                                                stroke="#e0e0e0"
+                                                tickLine={false}
+                                                domain={[0, 1000]}
+                                            />
+                                            <YAxis
+                                                yAxisId="right"
+                                                orientation="right"
+                                                label={{ value: 'Temperature (°C)', angle: 90, position: 'insideRight', style: { fontSize: 10, fill: '#aaa' } }}
+                                                tick={{ fontSize: 10, fill: '#888' }}
+                                                stroke="#e0e0e0"
+                                                tickLine={false}
+                                                domain={[0, 70]}
+                                            />
+                                            <Tooltip content={<CustomTooltip />} />
+                                            <Legend
+                                                wrapperStyle={{ paddingTop: '6px', fontSize: 11 }}
+                                                iconType="circle"
+                                                iconSize={8}
+                                            />
+                                            <Line
+                                                yAxisId="left"
+                                                type="monotone"
+                                                dataKey="irradiance"
+                                                stroke="#ffc107"
+                                                strokeWidth={2.5}
+                                                name="Irradiance"
+                                                unit=" W/m²"
+                                                dot={false}
+                                                activeDot={{ r: 5, fill: '#ffc107', stroke: '#fff', strokeWidth: 2 }}
+                                            />
+                                            <Line
+                                                yAxisId="right"
+                                                type="monotone"
+                                                dataKey="ambientTemp"
+                                                stroke="#0dcaf0"
+                                                strokeWidth={2}
+                                                name="Ambient Temp"
+                                                unit="°C"
+                                                dot={false}
+                                                activeDot={{ r: 4, fill: '#0dcaf0', stroke: '#fff', strokeWidth: 2 }}
+                                            />
+                                            <Line
+                                                yAxisId="right"
+                                                type="monotone"
+                                                dataKey="moduleTemp"
+                                                stroke="#dc3545"
+                                                strokeWidth={2}
+                                                name="Module Temp"
+                                                unit="°C"
+                                                dot={false}
+                                                activeDot={{ r: 4, fill: '#dc3545', stroke: '#fff', strokeWidth: 2 }}
+                                            />
+                                        </LineChart>
+                                    ) : (
+                                        <BarChart
+                                            data={chartData}
+                                            margin={{ top: 5, right: 35, left: 20, bottom: 20 }}
+                                        >
+                                            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                                            <XAxis
+                                                dataKey="time"
+                                                angle={timePeriod === '30days' ? -45 : 0}
+                                                textAnchor={timePeriod === '30days' ? 'end' : 'middle'}
+                                                height={timePeriod === '30days' ? 60 : 28}
+                                                interval={timePeriod === 'today' ? 1 : 0}
+                                                tick={{ fontSize: 10, fill: '#888' }}
+                                                stroke="#e0e0e0"
+                                                tickLine={false}
+                                            />
+                                            <YAxis
+                                                label={{ value: 'Irradiance (W/m²)', angle: -90, position: 'insideLeft', style: { fontSize: 10, fill: '#aaa' } }}
+                                                tick={{ fontSize: 10, fill: '#888' }}
+                                                stroke="#e0e0e0"
+                                                tickLine={false}
+                                                domain={[0, 'auto']}
+                                            />
+                                            <Tooltip content={<CustomTooltip />} />
+                                            <Legend
+                                                wrapperStyle={{ paddingTop: '6px', fontSize: 11 }}
+                                                iconType="circle"
+                                                iconSize={8}
+                                            />
+                                            <Bar
+                                                dataKey="irradiance"
+                                                fill="#ffc107"
+                                                name="Irradiance (W/m²)"
+                                                radius={[3, 3, 0, 0]}
+                                            />
+                                        </BarChart>
+                                    )}
+                                </ResponsiveContainer>
+                            )}
                         </div>
                     </div>
                 </div>
             </div>
-        </>
+        </div>
     )
 }
 
