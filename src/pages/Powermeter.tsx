@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { powerMeterApi, type PowerMeterData } from '../services/api'
 
-
 export interface PowerData {
   totalPower: number
   status: 'active' | 'warning' | 'fault'
@@ -43,13 +42,13 @@ const Powermeter = () => {
   const fetchPowerMeterHistory = useCallback(async () => {
     try {
       const now = new Date()
-      const start = new Date(now)
-      start.setHours(now.getHours() - 12)
+      const start = new Date()
+      start.setHours(0, 0, 0, 0)
 
       const response = await powerMeterApi.getHistory({
         start: start.toISOString(),
         stop: now.toISOString(),
-        limit: 12,
+        limit: 24,
       })
 
       const history = response.data || []
@@ -61,6 +60,7 @@ const Powermeter = () => {
       }
 
       const values = history.map((item) => Number(item.Total_Power_P || 0) / 1000)
+
       const labels = history.map((item) => {
         const date = new Date(item.time)
 
@@ -217,6 +217,17 @@ const Powermeter = () => {
   const avgHistoryValue =
     chartData.reduce((sum, item) => sum + item, 0) / chartData.length
 
+  const now = new Date()
+  const startOfToday = new Date()
+  startOfToday.setHours(0, 0, 0, 0)
+
+  const hoursToday = Math.max(
+    1,
+    (now.getTime() - startOfToday.getTime()) / (1000 * 60 * 60)
+  )
+
+  const energyToday = avgHistoryValue * hoursToday
+
   const chart = {
     width: 560,
     height: 210,
@@ -249,6 +260,13 @@ const Powermeter = () => {
       return `${x},${y}`
     })
     .join(' ')
+
+  const shouldShowXAxisLabel = (index: number) => {
+    if (chartLabels.length <= 6) return true
+
+    const step = Math.ceil(chartLabels.length / 6)
+    return index % step === 0 || index === chartLabels.length - 1
+  }
 
   return (
     <div className="compact-powermeter-page">
@@ -392,13 +410,11 @@ const Powermeter = () => {
                 <i className="bi bi-graph-up me-2"></i>
                 Power History
               </h5>
-              <span>Power output trend by backend history</span>
+              <span>Today power output trend</span>
             </div>
 
             <div className="history-tabs">
               <button className="active">Today</button>
-              <button>7D</button>
-              <button>30D</button>
             </div>
           </div>
 
@@ -415,7 +431,7 @@ const Powermeter = () => {
 
             <div>
               <span>Energy</span>
-              <strong>{(totalPowerKw * 5.2).toFixed(1)} kWh</strong>
+              <strong>{energyToday.toFixed(1)} kWh</strong>
             </div>
           </div>
 
@@ -426,8 +442,7 @@ const Powermeter = () => {
               preserveAspectRatio="none"
             >
               {yTicks.map((tick, index) => {
-                const y =
-                  chart.top + (index / (yTicks.length - 1)) * plotHeight
+                const y = chart.top + (index / (yTicks.length - 1)) * plotHeight
 
                 return (
                   <g key={`y-${index}`}>
@@ -471,7 +486,7 @@ const Powermeter = () => {
                       textAnchor="middle"
                       className="chart-axis-text"
                     >
-                      {index % 2 === 0 ? label : ''}
+                      {shouldShowXAxisLabel(index) ? label : ''}
                     </text>
                   </g>
                 )
