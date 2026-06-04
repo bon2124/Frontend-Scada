@@ -44,10 +44,10 @@ const makeInverter = (id: string, acPowerKw: number): InverterData => ({
 })
 
 export const mockInverters: InverterData[] = [
-  makeInverter('INV1', 3.8),
-  makeInverter('INV2', 4.1),
-  makeInverter('INV3', 3.6),
-  makeInverter('INV4', 3.9),
+  makeInverter('INV1', 3.99),
+  makeInverter('INV2', 4.30),
+  makeInverter('INV3', 3.76),
+  makeInverter('INV4', 4.15),
 ]
 
 export const mockInverterHistory = (inverterId: string): InverterData[] =>
