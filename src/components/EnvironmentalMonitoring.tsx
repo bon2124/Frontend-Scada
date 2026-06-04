@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { weatherApi, type WeatherData } from '../services/api'
 import {
     LineChart,
@@ -400,6 +400,52 @@ const SemiGauge = ({ value, max = 1000 }: { value: number; max?: number }) => {
 }
 
 /* ─────────────────────────────────────────────
+   Last Update Card (isolated timer)
+───────────────────────────────────────────── */
+const LastUpdateCard = () => {
+    const [now, setNow] = useState(new Date())
+
+    useEffect(() => {
+        const t = setInterval(() => setNow(new Date()), 1000)
+        return () => clearInterval(t)
+    }, [])
+
+    const timeStr = now.toLocaleTimeString('en-US', {
+        hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit',
+    })
+    const dateStr = now.toLocaleDateString('en-US', {
+        day: 'numeric', month: 'numeric', year: 'numeric',
+    })
+
+    return (
+        <div
+            style={{
+                background: 'white',
+                border: '1px solid #e2e8f0',
+                borderRadius: 10,
+                padding: '10px 14px',
+                borderLeft: '4px solid #f59e0b',
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column' as const,
+                justifyContent: 'center',
+            }}
+        >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <i className="bi bi-clock-history" style={{ fontSize: 14, color: '#f59e0b' }}></i>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#475569', letterSpacing: 0.3 }}>Last Update</span>
+            </div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', marginTop: 4, lineHeight: 1.2, fontFamily: '"Courier New", monospace' }}>
+                {timeStr}
+            </div>
+            <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, marginTop: 2 }}>
+                {dateStr} • Auto refresh every 30 seconds
+            </div>
+        </div>
+    )
+}
+
+/* ─────────────────────────────────────────────
    LabVIEW Panel
 ───────────────────────────────────────────── */
 const LabViewPanel = ({ weatherData }: { weatherData: WeatherData }) => {
@@ -409,6 +455,11 @@ const LabViewPanel = ({ weatherData }: { weatherData: WeatherData }) => {
 
     const irrHigh   = irr >= 800
     const irrNormal = irr >= 400 && irr < 800
+
+    // Track peak irradiance
+    const peakRef = useRef(irr)
+    if (irr > peakRef.current) peakRef.current = irr
+    const peakIrr = peakRef.current
 
     const ambHigh   = amb >= 35
     const ambNormal = amb >= 15 && amb < 35
@@ -429,140 +480,212 @@ const LabViewPanel = ({ weatherData }: { weatherData: WeatherData }) => {
                 background: 'linear-gradient(180deg, #fafafa 0%, #f2f2f2 100%)',
                 border: '1px solid #e0e0e0',
                 borderRadius: 12,
-                padding: '6px 32px 8px',
+                padding: '6px 16px 8px',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: 16,
+                gap: 12,
                 boxShadow: '0 2px 16px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.8)',
             }}
         >
-            {/* ── 1. Left Thermometer — Outside Temperature ── */}
-            <Thermometer
-                value={amb}
-                max={100}
-                label="Outside Temperature"
-                color="#2196f3"
-                gradientId="grad-amb"
-            />
+            {/* ══════ LEFT GROUP — Instruments ══════ */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
 
-            {/* ── 2. Ambient LED column ── */}
-            <div
-                style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: 12,
-                    padding: '10px 14px',
-                    background: 'white',
-                    borderRadius: 10,
-                    border: '1px solid #eee',
-                    boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
-                    alignSelf: 'center',
-                }}
-            >
-                <LED active={ambHigh}   col="#e53935" label="HIGH"   />
-                <LED active={ambNormal} col="#43a047" label="NORMAL" />
-                <LED active={ambLow}    col="#1e88e5" label="LOW"    />
-            </div>
+                {/* 1. Outside Temperature */}
+                <Thermometer
+                    value={amb}
+                    max={100}
+                    label="Outside Temperature"
+                    color="#2196f3"
+                    gradientId="grad-amb"
+                />
 
-            {/* ── 3. Center — Solar Irradiance gauge ── */}
-            <div
-                style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: 4,
-                    flex: 1,
-                }}
-            >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span
-                        style={{
-                            fontSize: 11,
-                            fontWeight: 700,
-                            color: '#444',
-                            letterSpacing: 1.5,
-                            textTransform: 'uppercase',
-                        }}
-                    >
-                        Solar Irradiance
-                    </span>
-                    <span
-                        style={{
-                            fontSize: 9,
-                            fontWeight: 700,
-                            color: irrColor,
-                            background: irrColor + '18',
-                            border: `1px solid ${irrColor}44`,
-                            borderRadius: 20,
-                            padding: '2px 8px',
-                            letterSpacing: 0.5,
-                            textTransform: 'uppercase',
-                        }}
-                    >
-                        {irrLabel}
-                    </span>
-                </div>
-
-
-                <SemiGauge value={irr} max={1000} />
-
-                {/* Digital readout — same style as thermometers */}
+                {/* 2. Ambient LED */}
                 <div
                     style={{
-                        background: '#1e293b',
-                        border: '1.5px solid #334155',
-                        borderRadius: 6,
-                        padding: '5px 12px',
-                        fontFamily: '"Courier New", monospace',
-                        fontSize: 17,
-                        fontWeight: 700,
-                        color: '#f8fafc',
-                        minWidth: 80,
-                        textAlign: 'center',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                        letterSpacing: 1,
                         display: 'flex',
-                        alignItems: 'baseline',
-                        justifyContent: 'center',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: 10,
+                        padding: '8px 10px',
+                        background: 'white',
+                        borderRadius: 10,
+                        border: '1px solid #eee',
+                        boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+                    }}
+                >
+                    <LED active={ambHigh}   col="#e53935" label="HIGH"   />
+                    <LED active={ambNormal} col="#43a047" label="NORMAL" />
+                    <LED active={ambLow}    col="#1e88e5" label="LOW"    />
+                </div>
+
+                {/* 3. Solar Irradiance gauge */}
+                <div
+                    style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
                         gap: 4,
                     }}
                 >
-                    <span>{irr.toFixed(0)}</span>
-                    <span style={{ fontSize: 15, fontWeight: 700, color: '#94a3b8' }}>W/m²</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span
+                            style={{
+                                fontSize: 11,
+                                fontWeight: 700,
+                                color: '#444',
+                                letterSpacing: 1.5,
+                                textTransform: 'uppercase',
+                            }}
+                        >
+                            Solar Irradiance
+                        </span>
+                        <span
+                            style={{
+                                fontSize: 9,
+                                fontWeight: 700,
+                                color: irrColor,
+                                background: irrColor + '18',
+                                border: `1px solid ${irrColor}44`,
+                                borderRadius: 20,
+                                padding: '2px 8px',
+                                letterSpacing: 0.5,
+                                textTransform: 'uppercase',
+                            }}
+                        >
+                            {irrLabel}
+                        </span>
+                    </div>
+
+                    <SemiGauge value={irr} max={1000} />
+
+                    <div
+                        style={{
+                            background: '#1e293b',
+                            border: '1.5px solid #334155',
+                            borderRadius: 6,
+                            padding: '5px 12px',
+                            fontFamily: '"Courier New", monospace',
+                            fontSize: 17,
+                            fontWeight: 700,
+                            color: '#f8fafc',
+                            minWidth: 80,
+                            textAlign: 'center',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                            letterSpacing: 1,
+                            display: 'flex',
+                            alignItems: 'baseline',
+                            justifyContent: 'center',
+                            gap: 4,
+                        }}
+                    >
+                        <span>{irr.toFixed(0)}</span>
+                        <span style={{ fontSize: 15, fontWeight: 700, color: '#94a3b8' }}>W/m²</span>
+                    </div>
                 </div>
 
+                {/* 4. Panel LED */}
+                <div
+                    style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: 10,
+                        padding: '8px 10px',
+                        background: 'white',
+                        borderRadius: 10,
+                        border: '1px solid #eee',
+                        boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+                    }}
+                >
+                    <LED active={modHigh}   col="#e53935" label="HIGH"   />
+                    <LED active={modNormal} col="#43a047" label="NORMAL" />
+                    <LED active={modLow}    col="#1e88e5" label="LOW"    />
+                </div>
+
+                {/* 5. Panel Temperature */}
+                <Thermometer
+                    value={mod}
+                    max={100}
+                    label="Panel Temperature"
+                    color="#ef5350"
+                    gradientId="grad-mod"
+                />
             </div>
 
-            {/* ── 4. Panel LED column ── */}
-            <div
-                style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: 12,
-                    padding: '10px 14px',
-                    background: 'white',
-                    borderRadius: 10,
-                    border: '1px solid #eee',
-                    boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
-                    alignSelf: 'center',
-                }}
-            >
-                <LED active={modHigh}   col="#e53935" label="HIGH"   />
-                <LED active={modNormal} col="#43a047" label="NORMAL" />
-                <LED active={modLow}    col="#1e88e5" label="LOW"    />
-            </div>
+            {/* ══════ RIGHT GROUP — Info Cards ══════ */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1, minWidth: 200 }}>
 
-            {/* ── 5. Right Thermometer — Panel Temperature ── */}
-            <Thermometer
-                value={mod}
-                max={100}
-                label="Panel Temperature"
-                color="#ef5350"
-                gradientId="grad-mod"
-            />
+                {/* Station Status */}
+                <div
+                    style={{
+                        background: 'white',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: 10,
+                        padding: '10px 14px',
+                        borderLeft: '4px solid #22c55e',
+                        flex: 1,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'center',
+                    }}
+                >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <i className="bi bi-activity" style={{ fontSize: 14, color: '#22c55e' }}></i>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: '#475569', letterSpacing: 0.3 }}>Station Status</span>
+                        </div>
+                        <span
+                            style={{
+                                fontSize: 9,
+                                fontWeight: 700,
+                                color: '#fff',
+                                background: '#22c55e',
+                                borderRadius: 12,
+                                padding: '2px 10px',
+                                letterSpacing: 0.5,
+                                textTransform: 'uppercase',
+                            }}
+                        >
+                            ● Normal
+                        </span>
+                    </div>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', marginTop: 4, lineHeight: 1.2 }}>
+                        Online
+                    </div>
+                    <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, marginTop: 2 }}>
+                        All sensors operational
+                    </div>
+                </div>
+
+                {/* Last Update */}
+                <LastUpdateCard />
+
+                {/* Peak Irradiance */}
+                <div
+                    style={{
+                        background: 'white',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: 10,
+                        padding: '10px 14px',
+                        borderLeft: '4px solid #e53935',
+                        flex: 1,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'center',
+                    }}
+                >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <i className="bi bi-lightning-charge-fill" style={{ fontSize: 14, color: '#e53935' }}></i>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: '#475569', letterSpacing: 0.3 }}>Peak Irradiance</span>
+                    </div>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', marginTop: 4, lineHeight: 1.2, fontFamily: '"Courier New", monospace' }}>
+                        {peakIrr.toFixed(0)} <span style={{ fontSize: 14, fontWeight: 700, color: '#94a3b8' }}>W/m²</span>
+                    </div>
+                    <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, marginTop: 2 }}>
+                        Highest today • {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </div>
+                </div>
+            </div>
         </div>
     )
 }
